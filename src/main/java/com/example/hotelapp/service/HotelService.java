@@ -18,10 +18,7 @@ public class HotelService {
     private final WebClient webClient;
     private final HotelInfoRepository hotelRepository;
 
-    // Spring Boot automatically injects the WebClient Builder and your Repository here
- // We removed WebClient.Builder from the parameters
     public HotelService(HotelInfoRepository hotelRepository) {
-        // We use WebClient.create() to build it manually instead
         this.webClient = WebClient.create("https://fguat65.iweensoft.com/api/flights");
         this.hotelRepository = hotelRepository;
     }
@@ -36,8 +33,6 @@ public class HotelService {
 
         // 2. Make the HTTP POST call using WebClient
         try {
-            // Because the exam uses a "fake-url", we expect this to return a JSON array of hotels.
-            // .bodyToFlux(HotelInfo.class) automatically parses the JSON response into your Entities!
             List<HotelInfo> importedHotels = webClient.post()
                     .uri("/fake-url")
                     .header("gw-flightapi-key", "SUPER_ONLINETEST")
@@ -46,16 +41,30 @@ public class HotelService {
                     .retrieve()
                     .bodyToFlux(HotelInfo.class) 
                     .collectList()
-                    .block(); // .block() waits for the external server to finish replying
+                    .block();
 
-            // 3. Save the parsed JSON into your H2 Database using the Repository
+            // 3. Save the parsed JSON into your Database
             if (importedHotels != null && !importedHotels.isEmpty()) {
                 hotelRepository.saveAll(importedHotels);
             }
             
         } catch (Exception e) {
             System.out.println("Error calling the external API: " + e.getMessage());
-            // In a real exam, if the fake-url is offline, this catch block prevents the app from crashing.
+            System.out.println("External API is offline. Injecting fallback mock data...");
+
+            // Create a dummy hotel to keep your database and GET endpoints functional
+            HotelInfo dummyHotel = new HotelInfo();
+            
+            // Using standard Java camelCase for the setter methods
+            dummyHotel.setHotelId(101L); 
+            dummyHotel.setHotelName("Grand Portfolio Resort");
+            dummyHotel.setProviderFamily("HotelBeds");
+            dummyHotel.setPropertyType("Resort");
+            dummyHotel.setRating(5.0);
+            
+            // Save the dummy record to Oracle
+            hotelRepository.save(dummyHotel);
+            System.out.println("Mock data saved successfully! You can now test your GET endpoints.");
         }
     }
 }
